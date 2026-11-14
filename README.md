@@ -40,21 +40,83 @@ The trainer keeps all of the Python training behaviour:
 * Checkpoints: `latest`, `last_epoch`, `last_mosaic_epoch`, `epoch_N` and `best_ckpt.pth`.
 * `--resume`, `--fp16` (CUDA autocast plus a C++ GradScaler) and `--cache` (RAM).
 
-## Build
+## Requirements
 
-Requirements: CMake ≥ 3.18, a C++17 compiler, LibTorch ≥ 2.0 (CUDA build for GPU training),
-and OpenCV ≥ 4 (core, imgproc, imgcodecs). JSON parsing uses a small built-in parser, so no
-other dependencies are needed.
+You need CMake ≥ 3.18, a C++17 compiler, LibTorch ≥ 2.0 (a CUDA build for GPU training) and
+OpenCV ≥ 4 (core, imgproc, imgcodecs). JSON parsing uses a small built-in parser, so no other
+libraries are needed.
+
+### Ubuntu packages
+
+Ubuntu 22.04 and 24.04 work. On 20.04 the stock CMake (3.16) is too old: install a newer one
+with `pip install cmake` or from Kitware's apt repository.
+
+**1. Build tools and OpenCV**
 
 ```bash
+sudo apt update
+sudo apt install -y build-essential cmake git unzip wget libopencv-dev
+```
+
+| Package | Why |
+|---|---|
+| `build-essential` | GCC/G++ with C++17 support (GCC 9 or newer) |
+| `cmake` | Build system (3.18 or newer) |
+| `libopencv-dev` | OpenCV headers and libraries for image loading and augmentation |
+| `git`, `unzip`, `wget` | Cloning the repo and downloading and unpacking LibTorch |
+
+**2. LibTorch (not available from apt)**
+
+Download the C++ build from <https://pytorch.org/get-started/locally/>. Choose
+**LibTorch → C++/Java → Linux**, choose either CUDA or CPU, and pick the **cxx11 ABI** zip.
+
+```bash
+wget -O libtorch.zip "<URL from pytorch.org>"
+unzip libtorch.zip -d ~/          # -> ~/libtorch
+```
+
+**3. NVIDIA GPU training**
+
+- **NVIDIA driver:** `sudo ubuntu-drivers install` (or e.g. `sudo apt install nvidia-driver-550`).
+  Check that it works with `nvidia-smi`.
+- **CUDA toolkit:** the CMake files of a CUDA build of LibTorch look for the toolkit at build
+  time. Its version should match the CUDA version of the LibTorch zip (for example `cu121`
+  needs CUDA 12.1). Ubuntu's `nvidia-cuda-toolkit` package is often an older version, so
+  install the matching version from NVIDIA's apt repository:
+  <https://developer.nvidia.com/cuda-downloads>.
+- cuDNN is included in the LibTorch zip, so you don't need to install it separately.
+
+For CPU-only use (debugging), skip this step and download the CPU LibTorch zip.
+
+**4. Python (optional)**
+
+Python is only needed for `tools/convert_pth.py` and for ONNX export with the original Python
+repo:
+
+```bash
+sudo apt install -y python3 python3-pip python3-venv
+python3 -m venv ~/yolox-venv && source ~/yolox-venv/bin/activate
+pip install torch            # the CPU build is enough for converting weights
+```
+
+## Build
+
+```bash
+git clone https://github.com/detu/yolox.cpp && cd yolox.cpp
 mkdir build && cd build
-cmake -DCMAKE_PREFIX_PATH="/path/to/libtorch;/path/to/opencv" ..
+cmake -DCMAKE_PREFIX_PATH=$HOME/libtorch ..
 #   or, with PyTorch installed via pip:
 #   cmake -DCMAKE_PREFIX_PATH=$(python -c "import torch;print(torch.utils.cmake_prefix_path)") ..
-cmake --build . -j
+cmake --build . -j"$(nproc)"
 ```
 
 This builds `yolox_train`, `yolox_eval`, `yolox_demo` and `test_coco_eval`.
+
+If the programs can't find the LibTorch libraries at runtime, add them to the library path:
+
+```bash
+export LD_LIBRARY_PATH=$HOME/libtorch/lib:$LD_LIBRARY_PATH
+```
 
 ## Dataset
 
