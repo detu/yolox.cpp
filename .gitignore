@@ -1,0 +1,7 @@
+build/
+YOLOX_outputs/
+datasets/
+*.pth
+*.pt
+*.onnx
+__pycache__/
